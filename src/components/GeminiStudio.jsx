@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Key, Send, Loader2, AlertCircle, CheckCircle, Image, Video, Copy, RefreshCcw } from 'lucide-react';
 import { geminiService } from '../services/geminiService';
-import { personaStorage } from '../services/personaStorage';
+import { veo3Service } from '../services/veo3Service';
 
 export function GeminiStudio({ persona, onBack }) {
   const [apiKey, setApiKey] = useState('');
   const [isApiKeySet, setIsApiKeySet] = useState(false);
+  const [mode, setMode] = useState('image'); // 'image' or 'video'
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -38,12 +39,22 @@ export function GeminiStudio({ persona, onBack }) {
     setResult(null);
 
     try {
-      const response = await geminiService.generateWithPersona(
-        persona,
-        prompt,
-        personaDescription
-      );
-      setResult(response);
+      let response;
+      if (mode === 'video') {
+        response = await veo3Service.generateVideoPrompt(
+          persona,
+          prompt,
+          personaDescription
+        );
+        setResult({ generatedPrompt: response.videoPrompt, isVideo: true });
+      } else {
+        response = await geminiService.generateWithPersona(
+          persona,
+          prompt,
+          personaDescription
+        );
+        setResult({ ...response, isVideo: false });
+      }
       setPersonaDescription(response.personaDescription);
     } catch (err) {
       setError(err.message);
@@ -53,18 +64,21 @@ export function GeminiStudio({ persona, onBack }) {
   };
 
   const handleCopyPrompt = () => {
-    if (result?.generatedPrompt) {
-      navigator.clipboard.writeText(result.generatedPrompt);
+    const text = result?.generatedPrompt || result?.videoPrompt;
+    if (text) {
+      navigator.clipboard.writeText(text);
     }
   };
 
-  const promptTemplates = [
+  const imageTemplates = [
     "Create a photo of me riding a horse on a beach at sunset",
     "Generate a professional headshot of me in a business suit",
-    "Create an image of me as a superhero flying over a city",
-    "Generate a photo of me hiking in the mountains",
-    "Create a portrait of me in Renaissance painting style"
+    "Create an image of me as a superhero flying over a city"
   ];
+
+  const videoTemplates = veo3Service.getTemplates().map(t => t.prompt);
+
+  const promptTemplates = mode === 'video' ? videoTemplates : imageTemplates;
 
   if (!isApiKeySet) {
     return (
@@ -128,8 +142,34 @@ export function GeminiStudio({ persona, onBack }) {
         </div>
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Gemini Studio</h2>
         <p className="text-gray-500 dark:text-neutral-400 text-sm mt-1">
-          Generate personalized images with your persona
+          Generate personalized content with your persona
         </p>
+      </div>
+
+      {/* Mode Tabs */}
+      <div className="flex bg-gray-100 dark:bg-neutral-800 rounded-xl p-1">
+        <button
+          onClick={() => { setMode('image'); setPrompt(''); setResult(null); }}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            mode === 'image'
+              ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+          }`}
+        >
+          <Image className="w-4 h-4" />
+          Image
+        </button>
+        <button
+          onClick={() => { setMode('video'); setPrompt(''); setResult(null); }}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+            mode === 'video'
+              ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300'
+          }`}
+        >
+          <Video className="w-4 h-4" />
+          Video
+        </button>
       </div>
 
       {/* Persona Preview */}
@@ -190,7 +230,7 @@ export function GeminiStudio({ persona, onBack }) {
         ) : (
           <>
             <Send className="w-5 h-5" />
-            Generate Prompt
+            Generate {mode === 'video' ? 'Video' : 'Image'} Prompt
           </>
         )}
       </button>
@@ -208,7 +248,7 @@ export function GeminiStudio({ persona, onBack }) {
         <div className="space-y-3 p-4 bg-gray-100 dark:bg-neutral-800 rounded-xl">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Generated Prompt
+              {result?.isVideo ? 'Video Prompt (Veo3)' : 'Image Prompt'}
             </h3>
             <button
               onClick={handleCopyPrompt}
