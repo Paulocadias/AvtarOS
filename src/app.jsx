@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Video, CheckCircle, XCircle, RefreshCcw, ChevronRight, Shield, User, AlertCircle, Loader2, ScanFace, MoveLeft, MoveRight, MoveUp, MoveDown, BadgeCheck, Zap, Fingerprint, Sun, Moon, CameraOff } from 'lucide-react';
 import { useFaceDetection } from './hooks/useFaceDetection';
+import { personaStorage, captureFrameFromVideo } from './services/personaStorage';
 
 // --- Components ---
 
@@ -21,7 +22,7 @@ const StepIndicator = ({ currentStep, totalSteps }) => {
   );
 };
 
-const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
+const CameraView = ({ onCapture, onFrameCapture, isVideo = false, autoStart = false }) => {
   const videoRef = useRef(null);
   const [hasStream, setHasStream] = useState(false);
   const [cameraError, setCameraError] = useState(false);
@@ -31,6 +32,7 @@ const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
   const [detectionState, setDetectionState] = useState(autoStart ? "initializing" : "idle");
   const [flash, setFlash] = useState(false);
   const [moveInstruction, setMoveInstruction] = useState(0);
+  const [capturedFrames, setCapturedFrames] = useState([]);
 
   // Real face detection with BlazeFace
   const { isLoading: isModelLoading, faceData, isModelReady } = useFaceDetection(
@@ -107,36 +109,58 @@ const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
   // --- Recording/Movement Logic ---
   useEffect(() => {
     let interval;
+    let lastPhase = -1;
+    const frames = [];
+
     if (isRecording && isVideo) {
-      const phaseDuration = 2500; 
+      const phaseDuration = 2500;
       const totalPhases = 5;
-      const totalDuration = phaseDuration * totalPhases; 
-      
+      const totalDuration = phaseDuration * totalPhases;
+
       const startTime = Date.now();
 
       interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const currentProgress = Math.min((elapsed / totalDuration) * 100, 100);
-        
+        const currentPhase = Math.floor((currentProgress / 100) * totalPhases);
+
         setProgress(currentProgress);
-        setMoveInstruction(Math.floor((currentProgress / 100) * totalPhases));
+        setMoveInstruction(currentPhase);
+
+        // Capture frame at each phase change
+        if (currentPhase !== lastPhase && videoRef.current) {
+          const frame = captureFrameFromVideo(videoRef.current);
+          if (frame) {
+            frames.push(frame);
+            if (onFrameCapture) {
+              onFrameCapture(frame);
+            }
+          }
+          lastPhase = currentPhase;
+        }
 
         if (currentProgress >= 100) {
           clearInterval(interval);
           setIsRecording(false);
-          onCapture(true);
+          setCapturedFrames(frames);
+          onCapture(frames);
         }
       }, 50);
     }
     return () => clearInterval(interval);
-  }, [isRecording, isVideo, onCapture]);
+  }, [isRecording, isVideo, onCapture, onFrameCapture]);
 
   const handleManualCapture = () => {
-    if (isVideo) return; 
+    if (isVideo) return;
     setFlash(true);
     setTimeout(() => setFlash(false), 200);
-    // In a real app, we would capture the frame from videoRef here
-    onCapture(null);
+
+    // Capture actual frame from video
+    const frame = captureFrameFromVideo(videoRef.current);
+    if (onFrameCapture && frame) {
+      onFrameCapture(frame);
+    }
+    onCapture(frame);
   };
 
   const getFeedbackText = () => {
@@ -410,21 +434,42 @@ export default function IdentityVerificationApp() {
   const [photoTaken, setPhotoTaken] = useState(false);
   const [videoTaken, setVideoTaken] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentPersona, setCurrentPersona] = useState(null);
 
   // Handlers
   const nextStep = () => setStep(s => s + 1);
-  
-  const handlePhotoCapture = () => {
-    setPhotoTaken(true);
-    setTimeout(() => nextStep(), 800); 
+
+  // Initialize or get persona when starting capture
+  const handleStartCapture = () => {
+    const persona = personaStorage.create();
+    setCurrentPersona(persona);
+    nextStep();
   };
 
-  const handleVideoCapture = () => {
+  const handlePhotoCapture = (frame) => {
+    if (currentPersona && frame) {
+      personaStorage.saveTexturePhoto(currentPersona.id, frame);
+    }
+    setPhotoTaken(true);
+    setTimeout(() => nextStep(), 800);
+  };
+
+  const handleVideoCapture = (frames) => {
+    if (currentPersona && frames && Array.isArray(frames)) {
+      frames.forEach(frame => {
+        personaStorage.addVolumetricFrame(currentPersona.id, frame);
+      });
+    }
     setVideoTaken(true);
     setTimeout(() => nextStep(), 500);
   };
 
   const handleValidationComplete = () => {
+    if (currentPersona) {
+      personaStorage.markComplete(currentPersona.id);
+      // Update local state with completed persona
+      setCurrentPersona(personaStorage.getById(currentPersona.id));
+    }
     nextStep();
   };
 
@@ -432,6 +477,7 @@ export default function IdentityVerificationApp() {
     setStep(0);
     setPhotoTaken(false);
     setVideoTaken(false);
+    setCurrentPersona(null);
   };
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
@@ -480,10 +526,10 @@ export default function IdentityVerificationApp() {
             </div>
 
             <button
-              onClick={nextStep}
+              onClick={handleStartCapture}
               className="w-full max-w-xs bg-gray-900 dark:bg-yellow-500 hover:bg-gray-800 dark:hover:bg-yellow-400 text-white dark:text-black font-bold py-4 rounded-xl shadow-lg shadow-gray-400/20 dark:shadow-yellow-900/20 transition-all transform active:scale-95 flex items-center justify-center gap-2 group"
             >
-              Initialize Capture 
+              Initialize Capture
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
