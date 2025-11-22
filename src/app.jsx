@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Video, CheckCircle, XCircle, RefreshCcw, ChevronRight, Shield, User, AlertCircle, Loader2, ScanFace, MoveLeft, MoveRight, MoveUp, MoveDown, BadgeCheck, Zap, Fingerprint, Sun, Moon, CameraOff } from 'lucide-react';
+import { Camera, Video, CheckCircle, XCircle, RefreshCcw, ChevronRight, Shield, User, AlertCircle, Loader2, ScanFace, MoveLeft, MoveRight, MoveUp, MoveDown, BadgeCheck, Zap, Fingerprint, Sun, Moon, CameraOff, Sparkles } from 'lucide-react';
 import { useFaceDetection } from './hooks/useFaceDetection';
 import { personaStorage, captureFrameFromVideo } from './services/personaStorage';
+import { GeminiStudio } from './components/GeminiStudio';
 
 // --- Components ---
 
@@ -589,11 +590,25 @@ export default function IdentityVerificationApp() {
             </div>
 
             <button
+              onClick={nextStep}
+              className="w-full max-w-xs bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-4 rounded-xl shadow-lg shadow-yellow-900/20 transition-all transform active:scale-95 flex items-center justify-center gap-2"
+            >
+              <Sparkles className="w-5 h-5" /> Open Gemini Studio
+            </button>
+
+            <button
               onClick={restart}
               className="text-gray-500 hover:text-gray-900 dark:text-neutral-400 dark:hover:text-white font-medium flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-neutral-800 px-6 py-3 rounded-full transition-all"
             >
               <RefreshCcw className="w-4 h-4" /> New Scan
             </button>
+          </div>
+        );
+
+      case 5: // Gemini Studio
+        return (
+          <div className="w-full">
+            <GeminiStudio persona={currentPersona} onBack={restart} />
           </div>
         );
 

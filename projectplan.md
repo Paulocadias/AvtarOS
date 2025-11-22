@@ -5,12 +5,12 @@ AvatarOS captures user biometrics to create a "Persona" database. Users can then
 
 ## Current Tasks
 
-- [ ] Integrate Google Gemini API for personalized image generation
-- [ ] Create Gemini Studio UI (prompt input + persona selection + generation)
 - [ ] Integrate Veo3 for personalized video generation
 
 ## Completed Tasks
 
+- [x] Integrate Google Gemini API for personalized image generation
+- [x] Create Gemini Studio UI (prompt input + persona selection + generation)
 - [x] Build Persona storage system (save captured photos/video to localStorage)
 - [x] Create actual image capture from video stream
 - [x] Add TensorFlow.js + BlazeFace for real AI face detection
