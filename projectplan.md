@@ -2,8 +2,6 @@
 
 ## Current Tasks
 
-- [ ] Initialize Git repository and push to GitHub
-- [ ] Add TensorFlow.js + BlazeFace for real AI face detection
 - [ ] Integrate Google Gemini API for image analysis
 - [ ] Build Persona Management system (store separate datasets)
 - [ ] Create Gemini Studio UI (prompt engineering tool)
@@ -12,6 +10,8 @@
 
 ## Completed Tasks
 
+- [x] Add TensorFlow.js + BlazeFace for real AI face detection
+- [x] Initialize Git repository and push to GitHub
 - [x] Fix config file typos (tailwind.cong.js → tailwind.config.js, potcss.config.js → postcss.config.js)
 
 ## Backlog

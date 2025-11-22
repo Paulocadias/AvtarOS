@@ -4,7 +4,10 @@
       "Bash(ren \"c:\\BOT\\AvatarOS\\tailwind.cong.js\" \"tailwind.config.js\")",
       "Bash(ren \"c:\\BOT\\AvatarOS\\potcss.config.js\" \"postcss.config.js\")",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

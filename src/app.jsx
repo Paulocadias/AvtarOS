@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Video, CheckCircle, XCircle, RefreshCcw, ChevronRight, Shield, User, AlertCircle, Loader2, ScanFace, MoveLeft, MoveRight, MoveUp, MoveDown, BadgeCheck, Zap, Fingerprint, Sun, Moon, CameraOff } from 'lucide-react';
+import { useFaceDetection } from './hooks/useFaceDetection';
 
 // --- Components ---
 
@@ -24,12 +25,18 @@ const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
   const videoRef = useRef(null);
   const [hasStream, setHasStream] = useState(false);
   const [cameraError, setCameraError] = useState(false);
-  
+
   const [isRecording, setIsRecording] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [detectionState, setDetectionState] = useState(autoStart ? "initializing" : "idle"); 
+  const [detectionState, setDetectionState] = useState(autoStart ? "initializing" : "idle");
   const [flash, setFlash] = useState(false);
-  const [moveInstruction, setMoveInstruction] = useState(0); 
+  const [moveInstruction, setMoveInstruction] = useState(0);
+
+  // Real face detection with BlazeFace
+  const { isLoading: isModelLoading, faceData, isModelReady } = useFaceDetection(
+    videoRef,
+    hasStream && !cameraError && (isVideo || detectionState !== "idle")
+  ); 
 
   // --- Real Camera Implementation ---
   useEffect(() => {
@@ -68,33 +75,34 @@ const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
     };
   }, []);
 
-  // --- Auto-Detection Logic (Wait for Stream) ---
+  // --- Auto-Detection Logic with Real Face Detection ---
   useEffect(() => {
     if (!isVideo || !autoStart || !hasStream) return;
 
-    let scanTimeout, detectTimeout;
+    let detectTimeout;
 
-    // Transition from initializing to scanning once stream is ready
-    if (detectionState === "initializing") {
-       setDetectionState("scanning");
+    // Transition from initializing to scanning once stream and model are ready
+    if (detectionState === "initializing" && isModelReady) {
+      setDetectionState("scanning");
     }
 
-    if (detectionState === "scanning") {
-      scanTimeout = setTimeout(() => setDetectionState("detected"), 2000); 
+    // Use real face detection to determine if face is detected and centered
+    if (detectionState === "scanning" && faceData.detected && faceData.centered) {
+      setDetectionState("detected");
     }
 
+    // Start recording once face is locked
     if (detectionState === "detected") {
       detectTimeout = setTimeout(() => {
         setDetectionState("recording");
         setIsRecording(true);
-      }, 1000); 
+      }, 1000);
     }
 
     return () => {
-      clearTimeout(scanTimeout);
       clearTimeout(detectTimeout);
     };
-  }, [isVideo, autoStart, detectionState, hasStream]);
+  }, [isVideo, autoStart, detectionState, hasStream, isModelReady, faceData.detected, faceData.centered]);
 
   // --- Recording/Movement Logic ---
   useEffect(() => {
@@ -134,9 +142,17 @@ const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
   const getFeedbackText = () => {
     if (cameraError) return "Camera Unavailable";
     if (!hasStream) return "Initializing Camera...";
-    
-    if (!isVideo) return "Tap shutter to capture";
-    if (detectionState === "scanning") return "Align Face in Grid";
+    if (isModelLoading) return "Loading AI Model...";
+
+    if (!isVideo) {
+      if (faceData.detected && faceData.centered) return "Perfect! Tap to capture";
+      if (faceData.detected) return "Center your face";
+      return "Position face in frame";
+    }
+    if (detectionState === "scanning") {
+      if (faceData.detected && !faceData.centered) return "Center your face";
+      return "Searching for face...";
+    }
     if (detectionState === "detected") return "Face Locked";
     if (isRecording) {
       const instructions = ["Look Center", "Turn Left", "Turn Right", "Look Up", "Look Down"];
@@ -195,8 +211,14 @@ const CameraView = ({ onCapture, isVideo = false, autoStart = false }) => {
         
         {/* Face Alignment Guide (Oval) */}
         {!isRecording && detectionState !== 'recording' && !cameraError && (
-             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[60%] w-64 h-80 border-2 border-white/20 rounded-[50%] box-border transition-colors duration-500">
-                {detectionState === 'scanning' && (
+             <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[60%] w-64 h-80 border-2 rounded-[50%] box-border transition-colors duration-500 ${
+               faceData.detected && faceData.centered
+                 ? 'border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.5)]'
+                 : faceData.detected
+                 ? 'border-yellow-500'
+                 : 'border-white/20'
+             }`}>
+                {detectionState === 'scanning' && !faceData.detected && (
                     <div className="absolute inset-0 border-2 border-yellow-500 rounded-[50%] animate-ping opacity-20"></div>
                 )}
              </div>
